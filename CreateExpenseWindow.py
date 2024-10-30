@@ -46,21 +46,28 @@ class ExpenseApp(QMainWindow):
         self.price_input = QLineEdit()
         self.price_input.setFixedWidth(100)
 
+        date_label = QLabel("Date:")
+        self.date_input = QLineEdit()
+        self.date_input.setFixedWidth(100)
+        
         # Create the button to add expenses
         add_button = QPushButton("Add Expense")
         add_button.clicked.connect(self.add_expense)
-
+        
         # Add widgets to the top panel
         top_panel.addWidget(expense_label)
         top_panel.addWidget(self.expense_input)
         top_panel.addWidget(price_label)
         top_panel.addWidget(self.price_input)
+        top_panel.addWidget(date_label)
+        top_panel.addWidget(self.date_input)
+        
         top_panel.addWidget(add_button)
 
         # Create the table to display expenses
         self.table = QTableWidget()
-        self.table.setColumnCount(3)  # Extra column for the delete button
-        self.table.setHorizontalHeaderLabels(["Expense", "Price", "Actions"])
+        self.table.setColumnCount(4)  # Extra column for the delete button
+        self.table.setHorizontalHeaderLabels(["Expense", "Price", "Date", "Actions"])
         layout.addWidget(self.table)
 
         # Create the bottom panel for displaying the total
@@ -72,11 +79,12 @@ class ExpenseApp(QMainWindow):
         layout.addLayout(total_layout)
 
         # Initialize with data from DB
-        initial_data = [(exp, pric) for exp, pric in self.data.data.items()]
+        initial_data = [(exp, desc["Price"], desc["Date"]) for exp, desc in self.data.data.items()]
         self.table.setRowCount(len(initial_data))
-        for row, (expense, price) in enumerate(initial_data):
+        for row, (expense, price, date) in enumerate(initial_data):
             self.table.setItem(row, 0, QTableWidgetItem(expense))
             self.table.setItem(row, 1, QTableWidgetItem(str(price)))
+            self.table.setItem(row, 2, QTableWidgetItem(date))
             self.add_delete_button(row)
         
         self.update_total()
@@ -85,6 +93,7 @@ class ExpenseApp(QMainWindow):
         # Get the values from the input fields
         expense_name = self.expense_input.text().strip()
         price_text = self.price_input.text().strip()
+        date = self.date_input.text().strip()
 
         # Validate inputs
         if not expense_name or expense_name.isdigit():
@@ -98,13 +107,14 @@ class ExpenseApp(QMainWindow):
             return
 
         # Add to the database
-        self.data.addExpense(expense_name, price)
+        self.data.addExpense(expense_name, price, date)
 
         # Add a new row to the table
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
         self.table.setItem(row_position, 0, QTableWidgetItem(expense_name))
         self.table.setItem(row_position, 1, QTableWidgetItem(str(price)))
+        self.table.setItem(row_position, 2, QTableWidgetItem(date))
         
         # Add a delete button to the row
         self.add_delete_button(row_position)
@@ -112,6 +122,7 @@ class ExpenseApp(QMainWindow):
         # Clear the input fields
         self.expense_input.clear()
         self.price_input.clear()
+        self.date_input.clear()
 
         # Update the total
         self.update_total()
@@ -120,7 +131,7 @@ class ExpenseApp(QMainWindow):
         # Create a delete button for the given row
         delete_button = QPushButton("Delete")
         delete_button.clicked.connect(self.delete_expense)
-        self.table.setCellWidget(row, 2, delete_button)
+        self.table.setCellWidget(row, 3, delete_button)
 
     def delete_expense(self):
         # Find the row of the delete button that was clicked

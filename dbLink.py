@@ -16,12 +16,13 @@ class ManipulateDB:
             with open("data.json", 'r') as db:
                 db.write("{}")
     
-    def addExpense(self, expense, price):
+    def addExpense(self, expense, price, date):
         
         if expense in self.data.keys():
-            self.data[expense] += price
+            old_price = self.data[expense]["Price"]
+            self.data[expense] = {"Price": price + old_price, "Date": date}
         else:
-            self.data[expense] = price
+            self.data[expense] = {"Price": price , "Date": date}
 
         self.writeToDB()
 
@@ -36,13 +37,4 @@ class ManipulateDB:
     def writeToDB(self):
         with open("data.json", "w") as db:
             json.dump(self.data, db, indent = 4)
-
-"""     def editExpense(self, expense, newPrice):
-        if expense in self.data.keys:
-            self.data[expense] = newPrice """
-
-""" test = ManipulateDB()
-
-test.addExpense(expense="miaw", price=23)
-test.deleteExpense("Veg") """
 
