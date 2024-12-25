@@ -1,4 +1,3 @@
-from dbLink import ManipulateDB
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QTableWidget, QTableWidgetItem, 
@@ -6,10 +5,11 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
+from dbLink import ExpenseDB
+
 class ExpenseApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.data = ManipulateDB()
         
         # Set up the main window
         self.setWindowTitle("Expense Tracker")
@@ -37,11 +37,15 @@ class ExpenseApp(QMainWindow):
         top_panel = QHBoxLayout()
         layout.addLayout(top_panel)
 
-        # Create labels and text fields for "Expense" and "Price"
+        # Create labels and text fields for "Expense", "Category", "Price", and "Date"
         expense_label = QLabel("Expense:")
         self.expense_input = QLineEdit()
         self.expense_input.setFixedWidth(150)
-
+        
+        category_label = QLabel("Category:")
+        self.category_input = QLineEdit()
+        self.category_input.setFixedWidth(150)
+        
         price_label = QLabel("Price:")
         self.price_input = QLineEdit()
         self.price_input.setFixedWidth(100)
@@ -57,17 +61,20 @@ class ExpenseApp(QMainWindow):
         # Add widgets to the top panel
         top_panel.addWidget(expense_label)
         top_panel.addWidget(self.expense_input)
+        top_panel.addWidget(category_label)
+        top_panel.addWidget(self.category_input)
         top_panel.addWidget(price_label)
         top_panel.addWidget(self.price_input)
         top_panel.addWidget(date_label)
         top_panel.addWidget(self.date_input)
         
         top_panel.addWidget(add_button)
+        
 
         # Create the table to display expenses
         self.table = QTableWidget()
-        self.table.setColumnCount(4)  # Extra column for the delete button
-        self.table.setHorizontalHeaderLabels(["Expense", "Price", "Date", "Actions"])
+        self.table.setColumnCount(5)  # Extra columns for the delete and category
+        self.table.setHorizontalHeaderLabels(["Expense", "Category", "Price", "Date", "Actions"])
         layout.addWidget(self.table)
 
         # Create the bottom panel for displaying the total
@@ -79,25 +86,33 @@ class ExpenseApp(QMainWindow):
         layout.addLayout(total_layout)
 
         # Initialize with data from DB
-        initial_data = [(exp, desc["Price"], desc["Date"]) for exp, desc in self.data.data.items()]
-        self.table.setRowCount(len(initial_data))
-        for row, (expense, price, date) in enumerate(initial_data):
-            self.table.setItem(row, 0, QTableWidgetItem(expense))
-            self.table.setItem(row, 1, QTableWidgetItem(str(price)))
-            self.table.setItem(row, 2, QTableWidgetItem(date))
-            self.add_delete_button(row)
+        self.DB = ExpenseDB()
+        
+        self.table.setRowCount(self.DB.countExpenses())
+        rows = self.DB.displayExpenses()
+        for i in range (len(rows)):
+            for j in range (4):
+                self.table.setItem(i, j, QTableWidgetItem(str(rows[i][j])))
+                
+            self.add_delete_button(i)
+                
         
         self.update_total()
 
     def add_expense(self):
         # Get the values from the input fields
-        expense_name = self.expense_input.text().strip()
+        expense = self.expense_input.text().strip()
+        category = self.category_input.text().strip()
         price_text = self.price_input.text().strip()
         date = self.date_input.text().strip()
 
         # Validate inputs
-        if not expense_name or expense_name.isdigit():
+        if not expense or expense.isdigit():
             self.show_error_message("Expense name must be a non-numeric text.")
+            return
+    
+        if not category or category.isdigit():
+            self.show_error_message("Category name must be a non-numeric text.")
             return
 
         try:
@@ -107,20 +122,22 @@ class ExpenseApp(QMainWindow):
             return
 
         # Add to the database
-        self.data.addExpense(expense_name, price, date)
+        self.DB.addExpense(expense, category, price, date)
 
         # Add a new row to the table
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
-        self.table.setItem(row_position, 0, QTableWidgetItem(expense_name))
-        self.table.setItem(row_position, 1, QTableWidgetItem(str(price)))
-        self.table.setItem(row_position, 2, QTableWidgetItem(date))
+        self.table.setItem(row_position, 0, QTableWidgetItem(expense))
+        self.table.setItem(row_position, 1, QTableWidgetItem(category))
+        self.table.setItem(row_position, 2, QTableWidgetItem(str(price)))
+        self.table.setItem(row_position, 3, QTableWidgetItem(date))
         
         # Add a delete button to the row
         self.add_delete_button(row_position)
 
         # Clear the input fields
         self.expense_input.clear()
+        self.category_input.clear()
         self.price_input.clear()
         self.date_input.clear()
 
@@ -131,7 +148,7 @@ class ExpenseApp(QMainWindow):
         # Create a delete button for the given row
         delete_button = QPushButton("Delete")
         delete_button.clicked.connect(self.delete_expense)
-        self.table.setCellWidget(row, 3, delete_button)
+        self.table.setCellWidget(row, 4, delete_button)
 
     def delete_expense(self):
         # Find the row of the delete button that was clicked
@@ -142,9 +159,10 @@ class ExpenseApp(QMainWindow):
             if index.isValid():
                 # Get the expense name from the first column of the row
                 expense_name = self.table.item(index.row(), 0).text()
+                expense_date = self.table.item(index.row(), 3).text()
 
                 # Delete from database
-                self.data.deleteExpense(expense_name)
+                self.DB.deleteExpense(expense_name, expense_date)
 
                 # Remove the row from the table
                 self.table.removeRow(index.row())
@@ -156,12 +174,12 @@ class ExpenseApp(QMainWindow):
         # Calculate the total price
         total = 0.0
         for row in range(self.table.rowCount()):
-            price_item = self.table.item(row, 1)
+            price_item = self.table.item(row, 2)
             if price_item:
                 try:
                     total += float(price_item.text())
                 except ValueError:
-                    pass
+                    print("cannot convert to a number>>>")
         self.total_value.setText(f"{total:.2f}")
 
     def show_error_message(self, message):
@@ -171,3 +189,4 @@ class ExpenseApp(QMainWindow):
         error_dialog.setWindowTitle("Input Error")
         error_dialog.setText(message)
         error_dialog.exec_()
+    
